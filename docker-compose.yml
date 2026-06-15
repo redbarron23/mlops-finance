@@ -26,11 +26,13 @@ services:
     depends_on:
       - mlflow
     environment:
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_TRACKING_URI=./mlruns
+      - MLFLOW_ALLOW_FILE_STORE=true
       - PYTHONUNBUFFERED=1
     volumes:
       - ./src:/app/src
       - ./data:/app/data
+      - ./mlruns:/app/mlruns
     networks:
       - mlops
 

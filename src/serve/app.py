@@ -57,17 +57,36 @@ class PredictionOutput(BaseModel):
 
 
 def load_model():
-    """Load model from MLflow Model Registry."""
+    """Load model from MLflow (local file store)."""
     global _model, _feature_columns
 
     if _model is not None:
         return _model
 
-    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-
     try:
-        model_uri = f"models:/{MODEL_NAME}/{MODEL_STAGE}"
-        _model = mlflow.pyfunc.load_model(model_uri)
+        os.environ["MLFLOW_ALLOW_FILE_STORE"] = "true"
+        mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+
+        # Try to load from local file store (mlruns directory)
+        import os as os_module
+        mlruns_dir = "/app/mlruns"  # Inside container
+        if not os_module.path.exists(mlruns_dir):
+            mlruns_dir = "mlruns"  # Local development
+
+        # Find the latest production model
+        model_uri = f"file://{os_module.path.abspath(mlruns_dir)}"
+        client = mlflow.MlflowClient(model_uri)
+
+        # Try to load from local models directory
+        import glob
+        model_paths = glob.glob(f"{mlruns_dir}/**/MLmodel", recursive=True)
+        if not model_paths:
+            raise FileNotFoundError(f"No MLflow models found in {mlruns_dir}")
+
+        # Use the first/latest model found
+        model_path = os_module.path.dirname(model_paths[0])
+        _model = mlflow.pyfunc.load_model(model_path)
+
         _feature_columns = [
             "sma_20",
             "sma_50",
@@ -79,7 +98,7 @@ def load_model():
             "return_lag_4",
             "return_lag_5",
         ]
-        print(f"Loaded {MODEL_NAME}/{MODEL_STAGE} from MLflow")
+        print(f"Loaded model from {model_path}")
         return _model
     except Exception as e:
         print(f"Failed to load model: {e}")
@@ -112,13 +131,9 @@ def log_prediction(input_data: dict, prediction: float):
 
 
 @app.on_event("startup")
-def startup():
-    """Load model on startup."""
-    try:
-        load_model()
-        print("✓ API ready")
-    except Exception as e:
-        print(f"✗ Startup error: {e}")
+async def startup():
+    """Log startup (model loads on first request)."""
+    print("✓ API started (model will load on first request)")
 
 
 @app.post("/predict")
