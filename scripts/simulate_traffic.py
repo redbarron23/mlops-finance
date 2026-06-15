@@ -16,7 +16,7 @@ API_URL = "http://localhost:8000"
 
 
 async def simulate_traffic(
-    tickers: list[str] = ["SPY", "AAPL", "MSFT"],
+    tickers: list[str] = ["GOOG", "NVDA", "ORCL", "MSFT"],
     start_date: str = "2022-01-01",
     end_date: str = "2024-12-31",
     delay_ms: int = 100,

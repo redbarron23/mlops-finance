@@ -153,7 +153,7 @@ def register_candidate_task(
 
 @flow(name="stock_retrain_flow")
 def retrain_flow(
-    tickers: list[str] = ["SPY", "AAPL", "MSFT"],
+    tickers: list[str] = ["GOOG", "NVDA", "ORCL", "MSFT"],
     train_end_date: str = "2022-12-31",
     test_end_date: str = "2023-12-31",
     drift_check: bool = True,

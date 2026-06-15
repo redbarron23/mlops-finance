@@ -6,7 +6,7 @@ import pandas as pd
 import yfinance as yf
 
 DATA_DIR = "data/raw"
-TICKERS = ["SPY", "AAPL", "MSFT"]
+TICKERS = ["GOOG", "NVDA", "ORCL", "MSFT"]
 START_DATE = "2018-01-01"
 END_DATE = None  # defaults to today
 
@@ -27,6 +27,11 @@ def fetch_stock_data(
     for ticker in tickers:
         print(f"Fetching {ticker} from {start} to {end or 'today'}...")
         df = yf.download(ticker, start=start, end=end, progress=False)
+
+        # Handle MultiIndex columns (when downloading multiple tickers)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
         df.columns = df.columns.str.lower()
         df["ticker"] = ticker
         df["date"] = df.index

@@ -12,8 +12,9 @@ from sklearn.model_selection import train_test_split
 
 from data.fetch import fetch_stock_data, load_stock_data
 from data.features import compute_features, get_feature_columns, get_target_column
+from data.demo_data import generate_all_synthetic_data
 
-MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
 MODEL_NAME = "stock_return_predictor"
 
 
@@ -159,13 +160,14 @@ def register_model_mlflow(
 def main():
     """Fetch data, train, and register baseline model."""
     # Ensure raw data exists
-    if not os.path.exists("data/raw"):
-        print("Fetching stock data...")
-        fetch_stock_data()
+    data_dir = "data/raw"
+    if not os.path.exists(data_dir) or not os.listdir(data_dir):
+        print("Generating synthetic stock data (yfinance unavailable)...")
+        generate_all_synthetic_data()
 
     print("\n=== Training baseline model (2018-2021) ===")
     X, y, feature_cols = prepare_training_data(
-        tickers=["SPY", "AAPL", "MSFT"],
+        tickers=["GOOG", "NVDA", "ORCL", "MSFT"],
         train_end_date="2021-12-31",
     )
 

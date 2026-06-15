@@ -7,12 +7,11 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./mlruns:/app/mlruns
-      - ./mlflow.db:/app/mlflow.db
+      - mlruns_volume:/mlruns
     command: >
       mlflow server
-      --backend-store-uri sqlite:////app/mlflow.db
-      --default-artifact-root /app/mlruns
+      --backend-store-uri sqlite:////mlruns/mlflow.db
+      --default-artifact-root /mlruns
       --host 0.0.0.0
     environment:
       - PYTHONUNBUFFERED=1
@@ -69,3 +68,4 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  mlruns_volume:

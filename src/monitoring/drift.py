@@ -43,7 +43,7 @@ def compute_drift_score(
 def load_reference_data(data_dir: str = "data/raw") -> pd.DataFrame:
     """Load reference (training) data for drift comparison."""
     all_dfs = []
-    for ticker in ["SPY", "AAPL", "MSFT"]:
+    for ticker in ["GOOG", "NVDA", "ORCL", "MSFT"]:
         path = os.path.join(data_dir, f"{ticker.lower()}.parquet")
         if os.path.exists(path):
             df = pd.read_parquet(path)
