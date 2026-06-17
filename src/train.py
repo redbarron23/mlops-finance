@@ -10,9 +10,9 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-from data.fetch import fetch_stock_data, load_stock_data
-from data.features import compute_features, get_feature_columns, get_target_column
-from data.demo_data import generate_all_synthetic_data
+from src.data.fetch import fetch_stock_data, load_stock_data
+from src.data.features import compute_features, get_feature_columns, get_target_column
+from src.data.demo_data import generate_all_synthetic_data
 
 MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "./mlruns")
 MODEL_NAME = "stock_return_predictor"

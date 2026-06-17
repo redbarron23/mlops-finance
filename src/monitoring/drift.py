@@ -1,11 +1,10 @@
-"""Detect data drift using Evidently."""
+"""Detect data drift using statistical methods."""
 import os
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from evidently.metric_preset import DataDriftPreset
-from evidently.report import Report
+from scipy import stats
 
 
 def compute_drift_score(
@@ -16,26 +15,29 @@ def compute_drift_score(
     """
     Compute drift score between reference (training) and production (recent) data.
 
-    Uses Evidently's DataDriftPreset to compute statistical drift.
+    Uses Kolmogorov-Smirnov test to detect distribution changes.
     Returns drift score (0-1, higher = more drift).
     """
-    report = Report(metrics=[DataDriftPreset()])
+    n_drifted = 0
 
-    report.run(
-        reference_data=reference_df[numerical_features],
-        current_data=production_df[numerical_features],
-    )
+    for feature in numerical_features:
+        if feature not in reference_df.columns or feature not in production_df.columns:
+            continue
 
-    drift_dict = report.as_dict()
-    metrics = drift_dict.get("metrics", [])
+        ref_data = reference_df[feature].dropna()
+        prod_data = production_df[feature].dropna()
 
-    if not metrics:
-        return 0.0
+        if len(ref_data) == 0 or len(prod_data) == 0:
+            continue
 
-    drift_metric = metrics[0]
-    n_drifted = drift_metric.get("result", {}).get("number_of_drifted_features", 0)
+        # Kolmogorov-Smirnov test for distribution change
+        ks_stat, p_value = stats.ks_2samp(ref_data, prod_data)
+
+        # Consider drift if p-value < 0.05 (statistically significant)
+        if p_value < 0.05:
+            n_drifted += 1
+
     total_features = len(numerical_features)
-
     drift_score = n_drifted / max(total_features, 1)
     return float(drift_score)
 
