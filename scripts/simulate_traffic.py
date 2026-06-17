@@ -63,7 +63,7 @@ async def simulate_traffic(
                 col: float(row[col]) for col in feature_cols
             }
             payload["ticker"] = row["ticker"]
-            payload["timestamp"] = row["date"]
+            payload["timestamp"] = str(row["date"])
 
             try:
                 resp = await client.post(
