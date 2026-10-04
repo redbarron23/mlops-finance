@@ -8,18 +8,20 @@ This project trains a stock price return predictor on historical data (2018–20
 
 **Why finance?** Market regimes (COVID crash, 2022 bear market, 2023–2024 bull run) produce *real, natural data drift*, so the retraining story isn't simulated—it's genuine.
 
+> This is a demo of MLOps mechanics (serving, monitoring, drift detection, automated retrain and promote), not a profitable trading model. Don't expect trading-grade accuracy.
+
 ## Architecture
 
 ```
 ┌──────────────┐
-│ Training Data│  (yfinance: SPY, AAPL, MSFT, 2018–2021)
+│ Training Data│  (yfinance: GOOG, NVDA, ORCL, MSFT)
 │  2018–2021   │
 └──────┬───────┘
        │
        ▼
 ┌─────────────────┐
 │ Feature Eng +   │──→ MLflow Registry (Production)
-│ XGBoost Train   │
+│ RandomForest    │
 └─────────────────┘
        │
        ▼
@@ -38,7 +40,7 @@ This project trains a stock price return predictor on historical data (2018–20
             │
             ▼
        ┌──────────────────────┐
-       │ Evidently Drift      │
+       │ KS-test Drift Score  │
        │ (feature distribution│
        │  vs reference)       │
        └──────────────────────┘
@@ -110,7 +112,7 @@ curl -X POST http://localhost:8000/predict \
     "return_lag_3": 0.003,
     "return_lag_4": -0.002,
     "return_lag_5": 0.001,
-    "ticker": "SPY",
+    "ticker": "MSFT",
     "timestamp": "2024-01-15"
   }'
 ```
@@ -119,7 +121,7 @@ Response:
 ```json
 {
   "prediction": 0.0012,
-  "ticker": "SPY",
+  "ticker": "MSFT",
   "timestamp": "2024-01-15"
 }
 ```
@@ -169,21 +171,17 @@ mlops-finance/
 │   │   └── features.py        # technical indicators + target
 │   ├── train.py               # RandomForest + MLflow tracking/registry
 │   ├── serve/
-│   │   ├── app.py             # FastAPI /predict, /metrics
-│   │   └── traffic_log.py     # log predictions (unused yet; future: detailed logging)
+│   │   └── app.py             # FastAPI /predict, /metrics
 │   ├── monitoring/
-│   │   └── drift.py           # Evidently drift detection
+│   │   └── drift.py           # KS-test drift score (scipy)
 │   └── pipeline/
 │       └── retrain_flow.py    # Prefect flow (retrain + validate + promote)
 ├── scripts/
 │   └── simulate_traffic.py    # Replay historical data through API
 ├── prometheus/
 │   └── prometheus.yml         # scrape /metrics from API
-├── grafana/
-│   └── dashboards/            # (dashboards added manually in UI)
 ├── tests/
-│   ├── test_features.py       # feature engineering tests
-│   └── test_train.py          # (placeholder for training tests)
+│   └── test_features.py       # feature engineering tests
 ├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml
@@ -201,6 +199,11 @@ mlops-finance/
 - Interpretable, no hyperparameter tuning needed
 - Fast to train, good baseline
 - Feature importance for explainability
+
+### Why a KS test instead of Evidently?
+- Per-feature two-sample Kolmogorov–Smirnov tests (scipy) are simple, transparent and dependency-light
+- The drift score is the share of features with p < 0.05; the retrain flow triggers at 0.3
+- Evidently reports are a possible future addition (see below)
 
 ### Why 2018–2021 training window?
 - Deliberately excludes 2022 bear market + 2023–2024 bull run
@@ -227,12 +230,13 @@ pytest tests/
 - Integration tests (mock MLflow, test full flow)
 - Cloud deployment (AWS ECS, SageMaker)
 - Model explainability (SHAP, permutation importance)
+- Evidently drift reports alongside the KS-test score
+- CI workflow and more tests (training, serving, retrain flow)
 
 ## References
 
 - **MLflow**: https://mlflow.org
 - **Prefect**: https://www.prefect.io
-- **Evidently**: https://www.evidentlyai.com
 - **FastAPI**: https://fastapi.tiangolo.com
 - **Prometheus**: https://prometheus.io
 - **Grafana**: https://grafana.com
