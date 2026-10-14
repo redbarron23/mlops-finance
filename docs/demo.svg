@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="300" viewBox="0 0 1000 300" role="img" aria-labelledby="title desc">
+<title id="title">MLOps finance local feature and drift demo</title>
+<desc id="desc">MLOps finance | local synthetic demo
+Generated price rows: 500
+Feature rows: 450 | model inputs: 9
+Unchanged feature distribution: drift=0.00
+Deliberately shifted distribution: drift=1.00
+Feature and drift checks passed. No market data or services used.</desc>
+<rect width="1000" height="300" rx="12" fill="#111827"/>
+<circle cx="28" cy="28" r="6" fill="#f87171"/><circle cx="48" cy="28" r="6" fill="#fbbf24"/><circle cx="68" cy="28" r="6" fill="#34d399"/>
+<text x="98" y="34" font-family="monospace" font-size="16" fill="#9ca3af">python scripts/demo_features.py</text>
+<g font-family="monospace" font-size="18" fill="#e5e7eb"><text x="28" y="90">MLOps finance | local synthetic demo</text>
+<text x="28" y="120">Generated price rows: 500</text>
+<text x="28" y="150">Feature rows: 450 | model inputs: 9</text>
+<text x="28" y="180">Unchanged feature distribution: drift=0.00</text>
+<text x="28" y="210">Deliberately shifted distribution: drift=1.00</text>
+<text x="28" y="240">Feature and drift checks passed. No market data or services used.</text></g>
+</svg>

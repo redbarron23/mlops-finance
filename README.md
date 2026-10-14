@@ -1,247 +1,93 @@
-# MLOps Portfolio: Stock Return Prediction with Drift Detection & Retraining
+# mlops-finance — Financial Model Lifecycle Demo
 
-A production-like MLOps system demonstrating the full lifecycle: **train → serve → monitor → detect drift → automatically retrain → validate → promote**.
+[![CI](https://github.com/redbarron23/mlops-finance/actions/workflows/ci.yml/badge.svg)](https://github.com/redbarron23/mlops-finance/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## Overview
+**Explore how a financial model is trained, served, monitored, and evaluated for retraining.**
+The prototype combines a RandomForest return model, FastAPI, MLflow, Prometheus/Grafana, and a
+Prefect candidate-retraining flow. Its focus is MLOps mechanics, not trading performance.
 
-This project trains a stock price return predictor on historical data (2018–2021), deploys it via FastAPI, monitors predictions with Prometheus/Grafana, detects when model performance degrades due to market regime shifts, and automatically retrains when data drift exceeds a threshold.
+![Local feature and drift demo on synthetic inputs](docs/demo.svg)
 
-**Why finance?** Market regimes (COVID crash, 2022 bear market, 2023–2024 bull run) produce *real, natural data drift*, so the retraining story isn't simulated—it's genuine.
+## Quick start
 
-> This is a demo of MLOps mechanics (serving, monitoring, drift detection, automated retrain and promote), not a profitable trading model. Don't expect trading-grade accuracy.
-
-## Architecture
-
-```
-┌──────────────┐
-│ Training Data│  (yfinance: GOOG, NVDA, ORCL, MSFT)
-│  2018–2021   │
-└──────┬───────┘
-       │
-       ▼
-┌─────────────────┐
-│ Feature Eng +   │──→ MLflow Registry (Production)
-│ RandomForest    │
-└─────────────────┘
-       │
-       ▼
-┌──────────────────────────────────┐
-│ FastAPI Serving + Logging        │
-│  (loads model from MLflow)       │
-│  POST /predict → log features    │
-│  GET /metrics → Prometheus       │
-└──────────────────────────────────┘
-       │
-       ├──→ Prometheus scrapes metrics
-       │    (prediction volume, latency, value)
-       │
-       └──→ Logs predictions to parquet
-            for drift analysis
-            │
-            ▼
-       ┌──────────────────────┐
-       │ KS-test Drift Score  │
-       │ (feature distribution│
-       │  vs reference)       │
-       └──────────────────────┘
-            │
-            ▼
-       ┌──────────────────────┐
-       │ Prefect Flow:        │
-       │ - Check drift        │
-       │ - Retrain if needed  │
-       │ - Validate           │
-       │ - Promote if better  │
-       └──────────────────────┘
-```
-
-## Quick Start
-
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.10+
-- ~2GB disk space (for data + artifacts)
-
-### 1. Build & Start Services
+Requirements: Python **3.10+**. Start with the local feature/drift demo; no market-data download,
+cloud credentials, or running services are needed.
 
 ```bash
-# Clone/enter project
+git clone https://github.com/redbarron23/mlops-finance.git
 cd mlops-finance
-
-# Build and start all services
-docker-compose up -d
-
-# Wait ~30s for services to be ready
-docker-compose logs -f api
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest tests/ -q
+python scripts/demo_features.py
 ```
 
-Services:
-- **MLflow** (tracking + registry): http://localhost:5000
-- **API** (FastAPI): http://localhost:8000
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/admin)
+The demo builds features from generated prices and compares unchanged versus shifted feature
+distributions with the existing drift helper. It does not train a trading model or run the services.
 
-### 2. Fetch Data & Train Baseline Model
+For the full local stack, run `docker compose up -d --build` and follow the
+[service walkthrough](docs/guide.md#quick-start). The services expose MLflow on `:5000`, the API on
+`:8000`, Prometheus on `:9090`, and Grafana on `:3000`.
+
+## How it works
+
+```mermaid
+flowchart LR
+    D[OHLCV data] --> F[Feature engineering]
+    F --> T[RandomForest training]
+    T --> M[MLflow artifacts]
+    M --> A[FastAPI predictions]
+    A --> P[Prometheus / Grafana]
+    A --> L[Prediction logs]
+    F --> K[KS-test drift helper]
+    K --> R[Prefect candidate workflow]
+    R --> T
+```
+
+The code contains feature engineering, model training and tracking, prediction serving and logging,
+feature-distribution tests, and candidate evaluation. The diagram shows these components; the
+end-to-end integration still has the limits below.
+
+## Quality and limits
+
+- Default training generates **synthetic data** when `data/raw/` is empty. Historical market data
+  can be supplied separately; it is not downloaded by the default training command.
+- CI covers feature engineering and a deterministic local drift demo. It does not establish
+  model accuracy or verify the full service/retraining stack.
+- The training helper uses a random train/test split. A financial-model benchmark needs a
+  time-based evaluation designed to prevent leakage; the current scores are demo results.
+- The logged-drift path still needs feature-engineered reference data wired to the prediction
+  logs. The local demo calls the drift helper directly with comparable feature columns.
+- Serving loads a local MLflow artifact and caches it. Registry-stage selection and automatic
+  model reload are not implemented; restarting after an artifact change clears the cache.
+- Docker Compose uses local demo services and default Grafana credentials. Configure access and
+  credentials before exposing the stack. This project is not a trading or production deployment recommendation.
+
+## Documentation
+
+| Topic | Guide |
+| --- | --- |
+| Services, training, predictions, and traffic replay | [Walkthrough](docs/guide.md#quick-start) |
+| Detailed component map | [Architecture](docs/guide.md#architecture) |
+| Modules and design choices | [Project structure](docs/guide.md#project-structure), [key decisions](docs/guide.md#key-decisions) |
+| Monitoring and future work | [Monitoring](docs/guide.md#monitoring--observability), [future enhancements](docs/guide.md#future-enhancements) |
+
+## Development
 
 ```bash
-# From your local machine (not in container)
-python -m pip install -e .
-export MLFLOW_TRACKING_URI=http://localhost:5000
-python src/train.py
+python -m pip install -e ".[dev]"
+python -m pytest tests/ -q
+python scripts/demo_features.py
 ```
 
-This:
-- Downloads OHLCV data (2018–2024) via yfinance
-- Trains on 2018–2021 only (to force drift when 2022–2024 is replayed)
-- Logs metrics/model to MLflow
-- Registers model as "Production" in the Model Registry
+GitHub Actions runs these checks on Python 3.10, 3.11, and 3.12. It does not fetch market data,
+register a model, or start a service.
 
-### 3. Make Predictions
+Follow the [open-source roadmap](https://github.com/users/redbarron23/projects/2).
 
-```bash
-# Single prediction
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sma_20": 420.5,
-    "sma_50": 415.0,
-    "rsi_14": 55.0,
-    "volatility_20": 0.015,
-    "return_lag_1": 0.002,
-    "return_lag_2": -0.001,
-    "return_lag_3": 0.003,
-    "return_lag_4": -0.002,
-    "return_lag_5": 0.001,
-    "ticker": "MSFT",
-    "timestamp": "2024-01-15"
-  }'
-```
+## License
 
-Response:
-```json
-{
-  "prediction": 0.0012,
-  "ticker": "MSFT",
-  "timestamp": "2024-01-15"
-}
-```
-
-### 4. Simulate Production Traffic (Watch Drift Happen)
-
-```bash
-# Replay 2022–2024 data through the API (simulates 2+ years of real-time predictions)
-# Because the model was trained only on 2018–2021 data, drift will be visible
-python scripts/simulate_traffic.py
-```
-
-This simulates ~600+ days of trading data flowing through `/predict`, logging predictions for drift analysis.
-
-### 5. Monitor Drift in Grafana
-
-1. Open http://localhost:3000 (admin/admin)
-2. **Data Source**: Prometheus (http://prometheus:9090)
-3. Create dashboard or use example panels:
-   - **Prediction Volume**: `predictions_total`
-   - **Prediction Latency**: `prediction_latency_seconds`
-   - **Drift Score** (once computed): custom metric from monitoring
-
-### 6. Run Retraining Pipeline (Manual)
-
-```bash
-# Trigger the Prefect flow manually
-export MLFLOW_TRACKING_URI=http://localhost:5000
-python src/pipeline/retrain_flow.py
-```
-
-This:
-1. Loads latest data
-2. Checks drift (optional)
-3. Trains a new model on an updated window (e.g., 2018–2022)
-4. Validates against 2022–2023 holdout
-5. If metrics improve, registers and promotes to "Production"
-6. FastAPI reloads the new model on next request
-
-## Project Structure
-
-```
-mlops-finance/
-├── src/
-│   ├── data/
-│   │   ├── fetch.py           # yfinance → parquet
-│   │   └── features.py        # technical indicators + target
-│   ├── train.py               # RandomForest + MLflow tracking/registry
-│   ├── serve/
-│   │   └── app.py             # FastAPI /predict, /metrics
-│   ├── monitoring/
-│   │   └── drift.py           # KS-test drift score (scipy)
-│   └── pipeline/
-│       └── retrain_flow.py    # Prefect flow (retrain + validate + promote)
-├── scripts/
-│   └── simulate_traffic.py    # Replay historical data through API
-├── prometheus/
-│   └── prometheus.yml         # scrape /metrics from API
-├── tests/
-│   └── test_features.py       # feature engineering tests
-├── Dockerfile
-├── docker-compose.yml
-├── pyproject.toml
-└── README.md
-```
-
-## Key Decisions
-
-### Why Prefect over Airflow?
-- Lighter weight, easier to run locally
-- Modern Python-native API (fewer YAML files)
-- Sufficient for a portfolio project
-
-### Why RandomForest?
-- Interpretable, no hyperparameter tuning needed
-- Fast to train, good baseline
-- Feature importance for explainability
-
-### Why a KS test instead of Evidently?
-- Per-feature two-sample Kolmogorov–Smirnov tests (scipy) are simple, transparent and dependency-light
-- The drift score is the share of features with p < 0.05; the retrain flow triggers at 0.3
-- Evidently reports are a possible future addition (see below)
-
-### Why 2018–2021 training window?
-- Deliberately excludes 2022 bear market + 2023–2024 bull run
-- Ensures real drift when recent data is replayed
-- Justifies retraining story
-
-## Testing
-
-```bash
-pytest tests/
-```
-
-## Monitoring & Observability
-
-- **MLflow UI**: http://localhost:5000 — view runs, models, artifacts
-- **Prometheus**: http://localhost:9090 — query metrics
-- **Grafana**: http://localhost:3000 — visualize drift, prediction volume, latency
-
-## Future Enhancements
-
-- Schedule the retrain flow (e.g., weekly via Prefect scheduler)
-- Add A/B testing: route % of traffic to candidate model
-- Production metrics dashboard in Grafana (pre-built JSON)
-- Integration tests (mock MLflow, test full flow)
-- Cloud deployment (AWS ECS, SageMaker)
-- Model explainability (SHAP, permutation importance)
-- Evidently drift reports alongside the KS-test score
-- CI workflow and more tests (training, serving, retrain flow)
-
-## References
-
-- **MLflow**: https://mlflow.org
-- **Prefect**: https://www.prefect.io
-- **FastAPI**: https://fastapi.tiangolo.com
-- **Prometheus**: https://prometheus.io
-- **Grafana**: https://grafana.com
-
----
-
-**Author**: James Hourihane  
-**Last Updated**: June 2026
+MIT. See [LICENSE](LICENSE). The license covers this repository's code; separately sourced market
+data remains subject to its source's terms.
